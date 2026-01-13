@@ -1,22 +1,45 @@
 from django.core.cache import cache
+from django_redis import get_redis_connection
 from .models import Property
 
 def get_all_properties():
-    """
-    Retrieves all properties from Redis cache if available, 
-    otherwise fetches from the database and caches the result for 1 hour.
-    """
-    # 1. Check Redis for 'all_properties'
+    """Existing utility to get/set properties cache."""
     queryset = cache.get('all_properties')
-
-    # 2. If not found, fetch from DB
     if queryset is None:
         queryset = Property.objects.all()
-        
-        # 3. Store the queryset in Redis for 3600 seconds (1 hour)
         cache.set('all_properties', queryset, 3600)
-        print("Fetched from Database and cached.") # Optional: for debugging
-    else:
-        print("Fetched from Cache.") # Optional: for debugging
-
     return queryset
+
+def get_redis_cache_metrics():
+    """
+    Connects to Redis, retrieves performance metrics, 
+    calculates the hit ratio, and logs the results.
+    """
+    # 1. Connect to Redis via django_redis
+    con = get_redis_connection("default")
+    
+    # 2. Get info stats from Redis
+    info = con.info()
+    hits = info.get('keyspace_hits', 0)
+    misses = info.get('keyspace_misses', 0)
+    
+    # 3. Calculate hit ratio
+    total_requests = hits + misses
+    hit_ratio = 0
+    if total_requests > 0:
+        hit_ratio = hits / total_requests
+
+    # 4. Prepare metrics dictionary
+    metrics = {
+        'keyspace_hits': hits,
+        'keyspace_misses': misses,
+        'hit_ratio': round(hit_ratio, 2),
+        'total_requests': total_requests,
+        'used_memory_human': info.get('used_memory_human', 'N/A')
+    }
+
+    # 5. Log metrics
+    print(f"--- Redis Metrics ---")
+    print(f"Hits: {hits} | Misses: {misses} | Ratio: {hit_ratio:.2f}")
+    
+    return metrics
