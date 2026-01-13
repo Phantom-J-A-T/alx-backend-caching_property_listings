@@ -1,23 +1,19 @@
-from django.shortcuts import render
-
-# Create your views here.
-from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.decorators.cache import cache_page
-from .models import Property
+from .utils import get_all_properties
 
-
-@cache_page(60 * 15)
 def property_list(request):
     """
-    Returns all properties wrapped in a JSON object.
+    View to return property listings using low-level cache utility.
     """
-    properties = Property.objects.all().values(
-        'id', 'title', 'description', 'price', 'location', 'created_at'
-    )
+    # Use the utility function instead of direct DB query
+    properties_qs = get_all_properties()
     
-    # Wrapping the list in a dictionary for a cleaner API response
+    # Convert queryset to list of dicts for JSON serialization
+    data = list(properties_qs.values(
+        'id', 'title', 'description', 'price', 'location', 'created_at'
+    ))
+    
     return JsonResponse({
         "status": "success",
-        "data": list(properties)
+        "data": data
     })
